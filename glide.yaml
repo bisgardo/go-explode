@@ -1,0 +1,8 @@
+package: github.com/bisgardo/go-explode
+import: []
+testImport:
+- package: github.com/stretchr/testify
+  version: ^1.7.0
+  subpackages:
+  - assert
+  - require
