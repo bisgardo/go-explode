@@ -78,13 +78,7 @@ func Explode(expr string) ([]string, error) {
 
 			// Append trailing suffix to all results.
 			if s != "" {
-				if result == nil {
-					result = append(result, s)
-				} else {
-					for i := range result {
-						result[i] += s
-					}
-				}
+				result = appendToAll(result, s)
 			}
 
 			// Push new expansion context.
@@ -106,13 +100,15 @@ func Explode(expr string) ([]string, error) {
 			offset = i + 1
 
 			// Flush result with the suffix appended into the context's set of inner strings.
-			if result == nil {
-				head.result = append(head.result, s)
-			} else {
+			if result != nil {
 				for _, r := range result {
 					head.result = append(head.result, r+s)
 				}
 				result = nil
+			} else { // if head.result != nil || s != "" {
+				// Not correct to say head.result = nil means []string{""}
+				// because it may actually be empty and it may actually contain an empty string.
+				head.result = append(head.result, s)
 			}
 		case '}':
 			if head == nil {
@@ -124,25 +120,17 @@ func Explode(expr string) ([]string, error) {
 			offset = i + 1
 
 			// Flush result with the suffix appended to the context's set of inner strings.
-			if result == nil {
-				head.result = append(head.result, s)
-			} else {
+			if result != nil {
 				for _, r := range result {
 					head.result = append(head.result, r+s)
 				}
+			} else if head.result != nil || s != "" {
+				head.result = append(head.result, s)
 			}
 
 			// Close the context by prepending all its prefixes to all its inner strings.
-			if head.prefixes == nil {
-				result = head.result
-			} else {
-				result = make([]string, 0, len(head.prefixes)*len(head.result))
-				for _, p := range head.prefixes {
-					for _, s := range head.result {
-						result = append(result, p+s)
-					}
-				}
-			}
+			// TODO This might result in result=[]string{""}.
+			result = combine(head.prefixes, head.result)
 
 			// Pop current context from stack.
 			head = head.parent
@@ -151,17 +139,44 @@ func Explode(expr string) ([]string, error) {
 
 	// Append any trailing suffix to all results.
 	s := expr[offset:]
-	if result == nil {
-		result = append(result, s)
-	} else if s != "" {
-		for i := range result {
-			result[i] += s
-		}
+	if s != "" {
+		result = appendToAll(result, s)
 	}
 	// Handle any unclosed context.
 	if head != nil {
 		// TODO Consider enabling error recovery.
 		return nil, Error{Pos: head.offset, Missing: '}'}
 	}
+	if result == nil {
+		return []string{""}, nil
+	}
 	return result, nil
+}
+
+func appendToAll(s []string, suffix string) []string {
+	if s == nil {
+		return append(s, suffix)
+	}
+	if suffix != "" {
+		for i := range s {
+			s[i] += suffix
+		}
+	}
+	return s
+}
+
+func combine(prefixes, s []string) []string {
+	if prefixes == nil {
+		return s
+	}
+	if s == nil {
+		return prefixes
+	}
+	r := make([]string, 0, len(prefixes)*len(s))
+	for _, p := range prefixes {
+		for _, s := range s {
+			r = append(r, p+s)
+		}
+	}
+	return r
 }
