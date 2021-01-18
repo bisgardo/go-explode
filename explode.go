@@ -31,6 +31,8 @@ func (e Error) Error() string {
 // The function returns an appropriate Error immediately after such an error is encountered.
 func Explode(expr string) ([]string, error) {
 	// TODO Explain what (sub)context means.
+	//      - Expansion context: Group delimited by braces.
+	//      - Sub-context: separator-delimited component of a given expansion context. ...
 	type context struct {
 		// Pointer to the context inside of which the context is nested.
 		parent *context
@@ -39,6 +41,11 @@ func Explode(expr string) ([]string, error) {
 		// Immutable set of prefixes that all substrings in the context will be appended to.
 		prefixes []string
 		// Mutable set of strings expanded locally in the context.
+		// TODO Could prepend prefixes eagerly such that we can just assign head.result to result on close?
+		//      Two issues:
+		//      1. Looping over prefixes before substring changes the order of the result.
+		//      2. It might result in more concatenations - consider "{a,b}{{c,d}e}":
+		//         Now e is being appended to "c" and "d" only - not all of "ac", "ad", "bc", and "bd".
 		result []string
 	}
 
@@ -50,8 +57,9 @@ func Explode(expr string) ([]string, error) {
 	// and then reset to "empty".
 	// When the current context is closed, its final local result is combined with the previous context's result
 	// (restored from 'prefixes') to give the updated result.
-	// TODO Consider letting nil represent the empty result ([""]).
-	result := []string{""}
+	// This also means that once the last context has been closed,
+	// the value contains the fully expanded set of strings (with the possible exception of a final suffix).
+	var result []string
 
 	// Start index of the substring that is currently being evaluated.
 	offset := 0
@@ -70,8 +78,12 @@ func Explode(expr string) ([]string, error) {
 
 			// Append trailing suffix to all results.
 			if s != "" {
-				for i := range result {
-					result[i] += s
+				if result == nil {
+					result = append(result, s)
+				} else {
+					for i := range result {
+						result[i] += s
+					}
 				}
 			}
 
@@ -82,7 +94,7 @@ func Explode(expr string) ([]string, error) {
 				prefixes: result,
 				result:   nil,
 			}
-			result = []string{""}
+			result = nil
 		case ',':
 			if head == nil {
 				// Comma is not valid outside a context.
@@ -94,10 +106,14 @@ func Explode(expr string) ([]string, error) {
 			offset = i + 1
 
 			// Flush result with the suffix appended into the context's set of inner strings.
-			for _, r := range result {
-				head.result = append(head.result, r+s)
+			if result == nil {
+				head.result = append(head.result, s)
+			} else {
+				for _, r := range result {
+					head.result = append(head.result, r+s)
+				}
+				result = nil
 			}
-			result = []string{""}
 		case '}':
 			if head == nil {
 				return nil, Error{Pos: i, Missing: '{'}
@@ -108,15 +124,23 @@ func Explode(expr string) ([]string, error) {
 			offset = i + 1
 
 			// Flush result with the suffix appended to the context's set of inner strings.
-			for _, r := range result {
-				head.result = append(head.result, r+s)
+			if result == nil {
+				head.result = append(head.result, s)
+			} else {
+				for _, r := range result {
+					head.result = append(head.result, r+s)
+				}
 			}
 
 			// Close the context by prepending all its prefixes to all its inner strings.
-			result = make([]string, 0, len(head.prefixes)*len(head.result))
-			for _, p := range head.prefixes {
-				for _, s := range head.result {
-					result = append(result, p+s)
+			if head.prefixes == nil {
+				result = head.result
+			} else {
+				result = make([]string, 0, len(head.prefixes)*len(head.result))
+				for _, p := range head.prefixes {
+					for _, s := range head.result {
+						result = append(result, p+s)
+					}
 				}
 			}
 
@@ -127,7 +151,9 @@ func Explode(expr string) ([]string, error) {
 
 	// Append any trailing suffix to all results.
 	s := expr[offset:]
-	if s != "" {
+	if result == nil {
+		result = append(result, s)
+	} else if s != "" {
 		for i := range result {
 			result[i] += s
 		}
