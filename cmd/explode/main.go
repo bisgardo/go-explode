@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
-)
 
-import "github.com/bisgardo/go-explode"
+	"github.com/bisgardo/go-explode"
+)
 
 func main() {
 	args := os.Args[1:]

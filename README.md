@@ -28,20 +28,39 @@ The algorithm is non-recursive and believed to be at least very close to optimal
 - `r{u,a}{,i}n` expands to `[run, ruin, ran, rain]`
 - `s{{a,o}{il,lv},l{ee,o}p}ing` expands to `[sailing, salving, soiling, solving, sleeping, sloping]`
 
-## Usage
+## Install
 
 #### Command "go get" (legacy)
 
-```
+```shell
 go get github.com/bisgardo/go-explode
 ```
 
 #### Glide (legacy)
 
-```
+```shell
 glide get github.com/bisgardo/go-explode
 ```
 
 #### Command "go mod"
 
 Coming soon.
+
+## Usage
+
+The library is just the function `explode.Explode`:
+
+```go
+import "github.com/bisgardo/go-explode"
+
+// ...
+
+res, err := explode.Explode(expr)
+if err != nil {
+	// ...
+}
+for _, r := range res {
+    fmt.Println(r)
+}
+```
+See the included [cmd](cmd/explode/main.go) for a slightly less trivial example.
