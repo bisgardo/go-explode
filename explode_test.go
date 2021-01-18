@@ -1,10 +1,10 @@
 package explode
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 /* TRIVIAL CASES */
@@ -107,52 +107,83 @@ func Test__group_triple_expands_to_all_combinations(t *testing.T) {
 }
 
 func Test__errors_are_reported_at_correct_location(t *testing.T) {
-	tests := []struct {
-		expr string
-		want Error
-	}{
-		{expr: ",", want: Error{Pos: 0, Missing: 0}},
-		{expr: "a,b", want: Error{Pos: 1, Missing: 0}},
-		{expr: "}", want: Error{Pos: 0, Missing: '{'}},
-		{expr: "{", want: Error{Pos: 0, Missing: '}'}},
-		{expr: "}{", want: Error{Pos: 0, Missing: '{'}},
-		{expr: "{{", want: Error{Pos: 1, Missing: '}'}},
-		{expr: "}}", want: Error{Pos: 0, Missing: '{'}},
-		{expr: "}}{{", want: Error{Pos: 0, Missing: '{'}},
-		{expr: "}{}{", want: Error{Pos: 0, Missing: '{'}},
-		{expr: ",{a,b},", want: Error{Pos: 0, Missing: 0}},
-		{expr: "{a,b},{c,d}", want: Error{Pos: 5, Missing: 0}},
-		{expr: "a}b{c}d{e", want: Error{Pos: 1, Missing: '{'}},
-		{expr: "ab}e{de},f}", want: Error{Pos: 2, Missing: '{'}},
-	}
-
-	for _, test := range tests {
-		t.Run(test.expr, func(t *testing.T) {
-			_, err := Explode(test.expr)
-			assert.Equal(t, test.want, err)
-		})
-	}
+	asser(t,
+		that(",", expandsTo(",")).with(error(0, 0)),
+		that("a,b", expandsTo("a,b")).with(error(1, 0)),
+		that("}", expandsTo("")).with(error(0, '{')),
+		that("{", expandsTo("")).with(error(0, '}')),
+		that("}{", expandsTo("")).with(error(0, '{'), error(1, '}')),
+		that("{{", expandsTo("")).with(error(1, '}'), error(0, '}')),
+		that("}}", expandsTo("")).with(error(0, '{'), error(1, '{')),
+		that("}}{{", expandsTo("")).with(error(0, '{'), error(1, '{'), error(3, '}'), error(2, '}')),
+		that("}{}{", expandsTo("")).with(error(0, '{'), error(3, '}')),
+		that(",{a,b},", expandsTo(",a,", ",b,")).with(error(0, 0), error(6, 0)),
+		that("{a,b},{c,d}", expandsTo("a,c", "a,d", "b,c", "b,d")).with(error(5, 0)),
+		that("a}b{c}d{e", expandsTo("abcde")).with(error(1, '{'), error(7, '}')),
+		that("a,d}e{fg},h}", expandsTo("a,defg,h")).with(error(1, 0), error(3, '{'), error(9, 0), error(11, '{')),
+	)
 }
 
 /* RUNNER UTILS */
 
+func testReportError(t *testing.T, expectedErrs []wantError) (ReportErrorFunc, *int) {
+	errCount := 0
+	return func(pos int, msg string) {
+		if errCount >= len(expectedErrs) {
+			t.Errorf("unexpected error: %d: %s", pos, msg)
+			return
+		}
+
+		w := expectedErrs[errCount]
+		errCount++
+		assert.Equal(t, w.pos, pos)
+		if w.unmatched == 0 {
+			assert.Equal(t, "invalid separator", msg)
+		} else {
+			assert.Equal(t, fmt.Sprintf("no matching '%c'", w.unmatched), msg)
+		}
+	}, &errCount
+}
+
+type wantError struct {
+	pos       int
+	unmatched rune
+}
+
+func error(pos int, unmatched rune) wantError {
+	return wantError{
+		pos:       pos,
+		unmatched: unmatched,
+	}
+}
+
 type spec struct {
-	expr string
-	want []string
+	expr     string
+	wantRes  []string
+	wantErrs []wantError
+}
+
+func (s spec) with(errs ...wantError) spec {
+	return spec{
+		expr:     s.expr,
+		wantRes:  s.wantRes,
+		wantErrs: errs,
+	}
 }
 
 func asser(t *testing.T, ss ...spec) {
 	for _, s := range ss {
 		t.Run(s.expr, func(t *testing.T) {
-			res, err := Explode(s.expr)
-			require.NoError(t, err)
-			assert.Equal(t, s.want, res)
+			reportError, errCount := testReportError(t, s.wantErrs)
+			res := Explode(s.expr, reportError)
+			assert.Equal(t, s.wantRes, res)
+			assert.Equal(t, len(s.wantErrs), *errCount)
 		})
 	}
 }
 
 func that(expr string, want []string) spec {
-	return spec{expr: expr, want: want}
+	return spec{expr: expr, wantRes: want}
 }
 
 func expandsTo(s ...string) []string {

@@ -16,15 +16,14 @@ func main() {
 	}
 
 	for _, input := range args {
-		res, err := explode.Explode(input)
-		if err != nil {
-			if explodeErr, ok := err.(explode.Error); ok {
+		firstErr := true
+		res := explode.Explode(input, func(pos int, msg string) {
+			if firstErr {
 				log(input)
-				log(indent(explodeErr.Pos) + "^ " + explodeErr.Error())
-			} else {
-				log(err.Error())
+				firstErr = false
 			}
-		}
+			log(indent(pos) + "^ " + msg)
+		})
 		for _, r := range res {
 			fmt.Println(r)
 		}

@@ -1,22 +1,8 @@
 package explode
 
-import "fmt"
-
-// Error is a syntax error of a brace expansion expression.
-type Error struct {
-	// Location of the character which triggered the error.
-	Pos int
-	// Missing match character that it expected to find.
-	// If the triggering character is a separator, then this is 0.
-	Missing rune
-}
-
-func (e Error) Error() string {
-	if e.Missing == 0 {
-		return fmt.Sprintf("%d: invalid separator", e.Pos)
-	}
-	return fmt.Sprintf("%d: no matching '%c' found", e.Pos, e.Missing)
-}
+// ReportErrorFunc is the type of a function which consumes errors encountered during Explode.
+// TODO Make function return whether the algorithm should recover or not.
+type ReportErrorFunc func(pos int, msg string)
 
 // Explode interprets a brace expansion expression and returns the list of expanded strings.
 // The expansion is computed as combinations of substrings separated by ',' and grouped recursively by '{}'
@@ -28,8 +14,8 @@ func (e Error) Error() string {
 //   r{u,a}{,i}n                 -> [run, ruin, ran, rain]
 //   s{{a,o}{il,lv},l{ee,o}p}ing -> [sailing, salving, soiling, solving, sleeping, sloping]
 // An unmatched brace or a separator outside any brace pair is considered a syntax error.
-// The function returns an appropriate Error immediately after such an error is encountered.
-func Explode(expr string) ([]string, error) {
+// Errors are reported to the provided function.
+func Explode(expr string, reportErr ReportErrorFunc) []string {
 	// TODO Explain what (sub)context means.
 	//      - Expansion context: Group delimited by braces.
 	//      - Sub-context: separator-delimited component of a given expansion context. ...
@@ -97,8 +83,10 @@ func Explode(expr string) ([]string, error) {
 			result = nil
 		case ',':
 			if head == nil {
-				// Comma is not valid outside a context.
-				return nil, Error{Pos: i, Missing: 0}
+				// Not inside context; comma is just a character like any other.
+				reportErr(i, "invalid separator")
+				// Otherwise just ignore.
+				continue
 			}
 
 			// Extract suffix.
@@ -116,7 +104,12 @@ func Explode(expr string) ([]string, error) {
 			}
 		case '}':
 			if head == nil {
-				return nil, Error{Pos: i, Missing: '{'}
+				// Not inside an expansion context: Brace is unmatched.
+				reportErr(i, "no matching '{'")
+				// Recover by creating a dummy context.
+				// Could alternatively restart the algorithm with a '{'
+				// inserted in the beginning.
+				head = &context{prefixes: nil}
 			}
 
 			// Extract suffix.
@@ -158,10 +151,28 @@ func Explode(expr string) ([]string, error) {
 			result[i] += s
 		}
 	}
-	// Handle any unclosed context.
-	if head != nil {
-		// TODO Consider enabling error recovery.
-		return nil, Error{Pos: head.offset, Missing: '}'}
+	// Handle unclosed contexts.
+	for head != nil {
+		reportErr(head.offset, "no matching '}'")
+
+		// Fill current result into context.
+		for _, r := range result {
+			head.result = append(head.result, r)
+		}
+
+		// Close the context by prepending all its prefixes to all its inner strings.
+		if head.prefixes == nil {
+			result = head.result
+		} else {
+			result = make([]string, 0, len(head.prefixes)*len(head.result))
+			for _, p := range head.prefixes {
+				for _, s := range head.result {
+					result = append(result, p+s)
+				}
+			}
+		}
+		// Pop current context from stack.
+		head = head.parent
 	}
-	return result, nil
+	return result
 }
