@@ -56,8 +56,10 @@ func Test__singleton_groups_expand_to_substring(t *testing.T) {
 
 func Test__single_nonempty_group_expands_to_all_substrings(t *testing.T) {
 	asser(t,
-		that("{b,c}", expandsTo("b", "c")),
-		that("{{b,c}}", expandsTo("b", "c")),
+		that("{,a}", expandsTo("", "a")),
+		that("{a,}", expandsTo("a", "")),
+		that("{a,b}", expandsTo("a", "b")),
+		that("{{a,b}}", expandsTo("a", "b")),
 		that("a{b,c}", expandsTo("ab", "ac")),
 		that("{a,b}c", expandsTo("ac", "bc")),
 		that("a{b,c}d", expandsTo("abd", "acd")),
