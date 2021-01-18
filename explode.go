@@ -56,16 +56,31 @@ func Explode(expr string) ([]string, error) {
 	// Start index of the substring that is currently being evaluated.
 	offset := 0
 
-	// TODO Implement escaping of '{', ',', and '}'.
 	// TODO Make delimiters configurable.
+
+	// TODO Substrings need to be escaped. Options:
+	//      - Extract runes eagerly into a buffer (probably the best solution, but would like to keep slicing when possible).
+	//      - Escape on a separate pass if needed (add extra var to track this).
+	//      - Store indices of runes to skip on extract (sounds bad).
+	inEscape := false
 
 	// Current context corresponding to the top element of the stack of contexts.
 	var head *context
 	for i, c := range expr {
 		switch c {
+		case '\\':
+			if inEscape {
+				inEscape = false
+				break
+			}
+			inEscape = true
 		case '{':
+			if inEscape {
+				inEscape = false
+				break
+			}
 			// Extract suffix.
-			s := expr[offset:i]
+			s := expr[offset:i] // TODO Needs to unescape.
 			offset = i + 1
 
 			// Append trailing suffix to all results.
@@ -84,13 +99,17 @@ func Explode(expr string) ([]string, error) {
 			}
 			result = []string{""}
 		case ',':
+			if inEscape {
+				inEscape = false
+				break
+			}
 			if head == nil {
 				// Comma is not valid outside a context.
 				return nil, Error{Pos: i, Missing: 0}
 			}
 
 			// Extract suffix.
-			s := expr[offset:i]
+			s := expr[offset:i] // TODO Needs to unescape.
 			offset = i + 1
 
 			// Flush result with the suffix appended into the context's set of inner strings.
@@ -99,12 +118,16 @@ func Explode(expr string) ([]string, error) {
 			}
 			result = []string{""}
 		case '}':
+			if inEscape {
+				inEscape = false
+				break
+			}
 			if head == nil {
 				return nil, Error{Pos: i, Missing: '{'}
 			}
 
 			// Extract suffix.
-			s := expr[offset:i]
+			s := expr[offset:i] // TODO Needs to unescape.
 			offset = i + 1
 
 			// Flush result with the suffix appended to the context's set of inner strings.
@@ -122,11 +145,18 @@ func Explode(expr string) ([]string, error) {
 
 			// Pop current context from stack.
 			head = head.parent
+		default:
+			if inEscape {
+				return nil, fmt.Errorf("invalid escape sequence '\\%c'", c)
+			}
 		}
+	}
+	if inEscape {
+		return nil, fmt.Errorf("invalid trailing backslash")
 	}
 
 	// Append any trailing suffix to all results.
-	s := expr[offset:]
+	s := expr[offset:] // TODO Needs to unescape.
 	if s != "" {
 		for i := range result {
 			result[i] += s

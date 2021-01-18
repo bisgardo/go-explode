@@ -16,7 +16,7 @@ left- and rightmost groups more and less "significant", respectively (i.e. like 
 
 The idea of brace expansion originates form the shell languages and is probably best known from
 [bash](https://www.gnu.org/software/bash/manual/html_node/Brace-Expansion.html).
-Compared to the bash implementation, this one doesn't (currently) support escaping nor `{1..3}` style sequences.
+Compared to the bash implementation, this one doesn't (currently) support `{1..3}` style sequences.
 
 While other implementations are easy to find (including in Go),
 this one is production ready by virtue of being polished, fully tested, and extremely fast:

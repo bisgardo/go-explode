@@ -104,7 +104,34 @@ func Test__group_triple_expands_to_all_combinations(t *testing.T) {
 	)
 }
 
-func Test__errors_are_reported_at_correct_location(t *testing.T) {
+func Test__braces_and_commas_and_backslash_may_be_escaped(t *testing.T) {
+	asser(t,
+		that(`\{`, expandsTo(`{,}`)),
+		that(`\,`, expandsTo(`{,}`)),
+		that(`\}`, expandsTo(`{,}`)),
+		that(`\`, expandsTo(`\`)),
+		that(`\{\,\}`, expandsTo(`{,}`)),
+	)
+}
+
+func Test__invalid_escape_sequences_are_rejected(t *testing.T) {
+	tests := []struct {
+		expr    string
+		wantErr string
+	}{
+		{expr: `\n`, wantErr: `invalid escape sequence '\n'`},
+		{expr: `\`, wantErr: `invalid trailing backslash`},
+	}
+
+	for _, test := range tests {
+		t.Run(test.expr, func(t *testing.T) {
+			_, err := Explode(test.expr)
+			assert.EqualError(t, err, test.wantErr)
+		})
+	}
+}
+
+func Test__syntax_errors_are_reported_at_correct_location(t *testing.T) {
 	tests := []struct {
 		expr string
 		want Error
