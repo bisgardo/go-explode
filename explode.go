@@ -18,7 +18,7 @@ func (e Error) Error() string {
 	return fmt.Sprintf("%d: no matching '%c' found", e.Pos, e.Missing)
 }
 
-// Explode interprets a brace expansion expression and returns the list of expanded strings.
+// String interprets a brace expansion expression and returns the list of expanded strings.
 // The expansion is computed as combinations of substrings separated by ',' and grouped recursively by '{}'
 // (see the README of this library for more details).
 // The result is ordered such that all expanded strings starting with a given substring in some group are generated
@@ -29,7 +29,7 @@ func (e Error) Error() string {
 //   s{{a,o}{il,lv},l{ee,o}p}ing -> [sailing, salving, soiling, solving, sleeping, sloping]
 // An unmatched brace or a separator outside any brace pair is considered a syntax error.
 // The function returns an appropriate Error immediately after such an error is encountered.
-func Explode(expr string) ([]string, error) {
+func String(expr string) ([]string, error) {
 	// TODO Explain what (sub)context means.
 	type context struct {
 		// Pointer to the context inside of which the context is nested.

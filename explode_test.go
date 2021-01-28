@@ -128,7 +128,7 @@ func Test__errors_are_reported_at_correct_location(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.expr, func(t *testing.T) {
-			_, err := Explode(test.expr)
+			_, err := String(test.expr)
 			assert.Equal(t, test.want, err)
 		})
 	}
@@ -144,7 +144,7 @@ type spec struct {
 func asser(t *testing.T, ss ...spec) {
 	for _, s := range ss {
 		t.Run(s.expr, func(t *testing.T) {
-			res, err := Explode(s.expr)
+			res, err := String(s.expr)
 			require.NoError(t, err)
 			assert.Equal(t, s.want, res)
 		})

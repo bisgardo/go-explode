@@ -16,7 +16,7 @@ func main() {
 	}
 
 	for _, input := range args {
-		res, err := explode.Explode(input)
+		res, err := explode.String(input)
 		if err != nil {
 			if explodeErr, ok := err.(explode.Error); ok {
 				log(input)

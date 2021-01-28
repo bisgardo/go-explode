@@ -48,14 +48,14 @@ Coming soon.
 
 ## Usage
 
-The library is just the function `explode.Explode`:
+The library exports the single function `explode.String`:
 
 ```go
 import "github.com/bisgardo/go-explode"
 
 // ...
 
-res, err := explode.Explode(expr)
+res, err := explode.String(expr)
 if err != nil {
 	// ...
 }
